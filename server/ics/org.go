@@ -1,7 +1,7 @@
 package ics
 
 import (
-	"github.com/niklasfasching/go-org/org"
+	"github.com/tongruirenye/OrgICSX5/server/org"
 )
 
 type IcsWriter struct {
@@ -113,5 +113,9 @@ func (w *IcsWriter) WriteFootnoteLink(f org.FootnoteLink) {
 
 }
 func (w *IcsWriter) WriteFootnoteDefinition(f org.FootnoteDefinition) {
+
+}
+
+func (w *IcsWriter) WriteTimeProperty(f org.TimeProperty) {
 
 }

@@ -8,4 +8,5 @@ require (
 	github.com/niklasfasching/go-org v1.5.0 // indirect
 	github.com/prometheus/procfs v0.6.0 // indirect
 	github.com/studio-b12/gowebdav v0.0.0-20210427212133-86f8378cf140 // indirect
+	golang.org/x/net v0.0.0-20210614182718-04defd469f4e // indirect
 )

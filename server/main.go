@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/beego/beego/v2/server/web"
 	beego "github.com/beego/beego/v2/server/web"
 	"github.com/tongruirenye/OrgICSX5/server/middleware"
 	"github.com/tongruirenye/OrgICSX5/server/models"
@@ -14,5 +15,6 @@ func main() {
 	beego.InsertFilter("/*", beego.BeforeRouter, middleware.LoginVerify)
 	models.InitDB()
 	storage.InitStorage()
+	go web.SetStaticPath("/static", "public")
 	beego.Run()
 }

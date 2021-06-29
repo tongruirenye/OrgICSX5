@@ -2,6 +2,8 @@ package controllers
 
 import (
 	beego "github.com/beego/beego/v2/server/web"
+	"github.com/beego/beego/v2/task"
+	"github.com/tongruirenye/OrgICSX5/server/ics"
 	"github.com/tongruirenye/OrgICSX5/server/models"
 	"github.com/tongruirenye/OrgICSX5/server/storage"
 )
@@ -53,4 +55,14 @@ func (c *SubController) Get() {
 
 	c.Layout = "site.tpl"
 	c.TplName = "sub.tpl"
+}
+
+type SubGenController struct {
+	beego.Controller
+}
+
+func (c *SubGenController) Get() {
+	task := task.NewTask("genics", "0 0 6 * * *", ics.GenIcsTask)
+	task.Run(nil)
+	c.Redirect("/sub", 302)
 }

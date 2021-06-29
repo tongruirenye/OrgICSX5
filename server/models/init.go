@@ -44,4 +44,5 @@ func InitDB() {
 	}
 
 	NewAdmin()
+	NewTestSub()
 }
