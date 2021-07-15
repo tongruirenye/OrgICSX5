@@ -607,6 +607,6 @@ func (fs *footnotes) updateDefinition(f FootnoteDefinition) {
 	}
 }
 
-func (w *HTMLWriter) WriteTimeProperty(t TimeProperty) {
+func (w *HTMLWriter) WritePlanning(t Planning) {
 
 }

@@ -252,6 +252,7 @@ func (d *Document) parseMany(i int, stop stopFn) (int, []Node) {
 
 func (d *Document) addHeadline(headline *Headline) int {
 	current := &Section{Headline: headline}
+	current.Headline.Section = current
 	d.Outline.last.add(current)
 	d.Outline.count++
 	d.Outline.last = current

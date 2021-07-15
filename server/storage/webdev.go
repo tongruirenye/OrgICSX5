@@ -2,6 +2,7 @@ package storage
 
 import (
 	"github.com/studio-b12/gowebdav"
+	"github.com/tongruirenye/OrgICSX5/server/config"
 )
 
 type WebDevClient struct {
@@ -9,6 +10,18 @@ type WebDevClient struct {
 	user     string
 	password string
 	client   *gowebdav.Client
+}
+
+var AppStorage *WebDevClient
+
+func InitStorage() {
+	if AppStorage != nil {
+		return
+	}
+
+	AppStorage = NewWebDevClient(config.AppConfig.WebDevRoot,
+		config.AppConfig.WebDevUser,
+		config.AppConfig.WebDevPass)
 }
 
 func NewWebDevClient(url, user, password string) *WebDevClient {

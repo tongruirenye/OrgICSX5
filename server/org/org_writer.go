@@ -368,14 +368,23 @@ func (w *OrgWriter) WriteMacro(m Macro) {
 	w.WriteString(fmt.Sprintf("{{{%s(%s)}}}", m.Name, strings.Join(m.Parameters, ",")))
 }
 
-func (w *OrgWriter) WriteTimeProperty(t TimeProperty) {
+func (w *OrgWriter) WritePlanning(t Planning) {
 	if t.Deadline != nil {
-		d, _ := t.Deadline.(Deadline)
-		w.WriteString(fmt.Sprintf("DEADLINE:<%s> ", d.Time))
+		d, _ := t.Deadline.(Timestamp)
+		if d.IsDate {
+			w.WriteString(fmt.Sprintf("DEADLINE:<%s> ", d.Time.Format(datestampFormat)))
+		} else {
+			w.WriteString(fmt.Sprintf("DEADLINE:<%s> ", d.Time.Format(timestampFormat)))
+		}
+
 	}
 	if t.Schedule != nil {
-		s, _ := t.Schedule.(Schedule)
-		w.WriteString(fmt.Sprintf("SCHEDULE:<%s %s-%s %s>", s.Time, s.Start, s.End, s.Interval))
+		s, _ := t.Schedule.(Timestamp)
+		if s.IsDate {
+			w.WriteString(fmt.Sprintf("SCHEDULE:<%s>", s.Time.Format(datestampFormat)))
+		} else {
+			w.WriteString(fmt.Sprintf("SCHEDULE:<%s>", s.Time.Format(timestampFormat)))
+		}
 	}
 
 	w.WriteString("\n")

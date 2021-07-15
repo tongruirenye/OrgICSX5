@@ -29,6 +29,7 @@ type Headline struct {
 	Tags       []string
 	Children   []Node
 	Time       Node
+	Section    *Section
 }
 
 var headlineRegexp = regexp.MustCompile(`^([*]+)\s+(.*)`)
@@ -74,7 +75,7 @@ func (d *Document) parseHeadline(i int, parentStop stopFn) (int, Node) {
 	}
 	consumed, nodes := d.parseMany(i+1, stop)
 	if len(nodes) > 0 {
-		if d, ok := nodes[0].(TimeProperty); ok {
+		if d, ok := nodes[0].(Planning); ok {
 			headline.Time = d
 			nodes = nodes[1:]
 		}
