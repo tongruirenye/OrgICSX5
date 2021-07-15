@@ -208,6 +208,7 @@ func (w *IcsWriter) WriteHeadline(h org.Headline) {
 	w.WriteString(fmt.Sprintf("DTEND;TZID=Asia/Shanghai;VALUE=DATE-TIME:%s\n", end.Format("20060102T150400")))
 	if rule != "" {
 		w.WriteString(rule)
+		w.WriteString("\n")
 	}
 	w.WriteString(fmt.Sprintf("SUMMARY:[%s]%s\n", w.document.BufferSettings["TITLE"], summary))
 	w.WriteString(fmt.Sprintf("STATUS:%s\n", status))
