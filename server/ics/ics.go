@@ -97,7 +97,7 @@ func NewIcs(l *log.Logger) *ICS {
 		writer:    make(map[string]*IcsWriter),
 		logger:    l,
 		closeChan: make(chan struct{}),
-		taskChan:  make(chan struct{}),
+		taskChan:  make(chan struct{}, 1),
 	}
 	ics.ctx, ics.cancel = context.WithCancel(context.Background())
 	return ics
@@ -114,6 +114,7 @@ func (ics *ICS) Run() {
 		case <-timer.C:
 			timer.Reset(1 * time.Second)
 			if triggerTimer(lastTime, 3, 0) {
+				ics.logger.Println("trigger timer")
 				lastTime = time.Now()
 				ics.Task()
 			}
