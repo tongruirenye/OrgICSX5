@@ -114,6 +114,17 @@ func (w *IcsWriter) WriteHeadline(h org.Headline) {
 		deadline, _ := planning.Deadline.(org.Timestamp)
 		start = schedule.Time
 		end = deadline.Time
+		if rule, _ := h.Properties.Get("REPEAT"); rule != "" {
+			if schedule.EndTime != nil {
+				end = *schedule.EndTime
+			} else {
+				if schedule.IsDate {
+					end = start.AddDate(0, 0, 1)
+				} else {
+					end = start.Add(1 * time.Hour)
+				}
+			}
+		}
 	} else if planning.Schedule != nil {
 		schedule, _ := planning.Schedule.(org.Timestamp)
 		start = schedule.Time
