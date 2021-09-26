@@ -88,7 +88,7 @@ func NewIcs(l *log.Logger) *ICS {
 			AutoLink:            true,
 			MaxEmphasisNewLines: 1,
 			DefaultSettings: map[string]string{
-				"TODO":         "PROJ | TODO | NEXT | INPROGRESS | DONE",
+				"TODO":         "TODO | INPROGRESS",
 				"EXCLUDE_TAGS": "noexport",
 			},
 			Log:      l,
@@ -141,12 +141,23 @@ func (ics *ICS) Close() {
 	<-ics.closeChan
 }
 
+func (ics *ICS) clearWriter() {
+	if ics.writer == nil {
+		return
+	}
+
+	for _, v := range ics.writer {
+		v.ClearContent()
+	}
+}
+
 func (ics *ICS) Do() {
-	files, _ := storage.AppStorage.ListFileList("org/roam/project")
+	files, _ := storage.AppStorage.ListFileList("org/project")
 	if files == nil || len(files) == 0 {
 		return
 	}
 
+	ics.clearWriter()
 	for _, v := range files {
 		ics.logger.Printf("parse file:%s\n", v)
 		if err := ics.parse(v); err != nil {
@@ -164,7 +175,7 @@ func (ics *ICS) DoLocal(path string) error {
 	}
 	defer f.Close()
 	doc := ics.config.Parse(f, "")
-	calName := doc.Get("CATEGORY")
+	calName := doc.Get("CALENDAR")
 	if calName == "" {
 		calName = "其他"
 	}
@@ -174,13 +185,13 @@ func (ics *ICS) DoLocal(path string) error {
 }
 
 func (ics *ICS) parse(fileName string) error {
-	f, err := storage.AppStorage.ReadFile("org/roam/project/" + fileName)
+	f, err := storage.AppStorage.ReadFile("org/project/" + fileName)
 	if err != nil {
 		return err
 	}
 	freader := bytes.NewReader(f)
 	doc := ics.config.Parse(freader, "")
-	calName := doc.Get("CATEGORY")
+	calName := doc.Get("CALENDAR")
 	if calName == "" {
 		calName = "其他"
 	}
