@@ -20,7 +20,6 @@ import (
 func main() {
 	configFlag := pflag.StringP("config", "c", "", "web proxy config path.")
 	parseFlag := pflag.BoolP("parse", "p", false, "parse")
-	localFlag := pflag.StringP("local", "l", "", "local file path")
 	pflag.Parse()
 
 	if err := config.InitConfig(*configFlag); err != nil {
@@ -40,13 +39,7 @@ func main() {
 
 	icsParser := ics.NewIcs(log.Default())
 	if *parseFlag {
-		if *localFlag != "" {
-			if e := icsParser.DoLocal(config.AppPath + *localFlag); e != nil {
-				fmt.Println(e)
-			}
-		} else {
-			icsParser.Do()
-		}
+		icsParser.Do()
 		return
 	}
 

@@ -14,6 +14,8 @@ type Config struct {
 	Sign        string
 	Port        string
 	Mode        string
+	CalName     string
+	Project     string
 	viperConfig *viper.Viper
 }
 
@@ -45,6 +47,8 @@ func InitConfig(path string) error {
 	AppConfig.Sign = AppConfig.viperConfig.GetString("auth.sign")
 	AppConfig.Port = AppConfig.viperConfig.GetString("base.port")
 	AppConfig.Mode = AppConfig.viperConfig.GetString("base.mode")
+	AppConfig.CalName = AppConfig.viperConfig.GetString("base.cal")
+	AppConfig.Project = AppConfig.viperConfig.GetString("base.project")
 
 	return nil
 }

@@ -5,11 +5,11 @@ import (
 	"context"
 	"io/ioutil"
 	"log"
-	"os"
 	"time"
 
-	"github.com/tongruirenye/OrgICSX5/server/org"
+	"github.com/tongruirenye/OrgICSX5/server/config"
 	"github.com/tongruirenye/OrgICSX5/server/storage"
+	"github.com/tongruirenye/go-org/org"
 )
 
 func isSameDay(lhs, rhs time.Time) bool {
@@ -72,7 +72,7 @@ func triggerTimer(lastTime time.Time, hour, minute int) bool {
 
 type ICS struct {
 	config *org.Configuration
-	writer map[string]*IcsWriter
+	writer *IcsWriter
 	logger *log.Logger
 
 	closeChan chan struct{}
@@ -88,13 +88,13 @@ func NewIcs(l *log.Logger) *ICS {
 			AutoLink:            true,
 			MaxEmphasisNewLines: 1,
 			DefaultSettings: map[string]string{
-				"TODO":         "TODO | INPROGRESS",
+				"TODO":         "TODO | SCHED | DOING | WAITING",
 				"EXCLUDE_TAGS": "noexport",
 			},
 			Log:      l,
 			ReadFile: ioutil.ReadFile,
 		},
-		writer:    make(map[string]*IcsWriter),
+		writer:    new(IcsWriter),
 		logger:    l,
 		closeChan: make(chan struct{}),
 		taskChan:  make(chan struct{}, 1),
@@ -146,66 +146,39 @@ func (ics *ICS) clearWriter() {
 		return
 	}
 
-	for _, v := range ics.writer {
-		v.ClearContent()
-	}
+	ics.logger.Println("start parse")
+	ics.writer.ClearContent()
 }
 
 func (ics *ICS) Do() {
-	files, _ := storage.AppStorage.ListFileList("org/project")
-	if files == nil || len(files) == 0 {
-		return
-	}
+	// files, _ := storage.AppStorage.ListFileList("org/roam")
+	// if files == nil || len(files) == 0 {
+	// 	return
+	// }
 
 	ics.clearWriter()
-	for _, v := range files {
-		ics.logger.Printf("parse file:%s\n", v)
-		if err := ics.parse(v); err != nil {
-			ics.logger.Println(err.Error())
-		}
+	if err := ics.parse(config.AppConfig.Project); err != nil {
+		ics.logger.Println(err.Error())
 	}
-
 	ics.dump()
-}
-
-func (ics *ICS) DoLocal(path string) error {
-	f, err := os.Open(path)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	doc := ics.config.Parse(f, "")
-	calName := doc.Get("CALENDAR")
-	if calName == "" {
-		calName = "其他"
-	}
-	writer := NewIcsWriter()
-	doc.Write(writer)
-	return writer.Dump(calName)
+	ics.logger.Println("end parse")
 }
 
 func (ics *ICS) parse(fileName string) error {
-	f, err := storage.AppStorage.ReadFile("org/project/" + fileName)
+	f, err := storage.AppStorage.ReadFile("org/roam/" + fileName)
 	if err != nil {
 		return err
 	}
 	freader := bytes.NewReader(f)
 	doc := ics.config.Parse(freader, "")
-	calName := doc.Get("CALENDAR")
-	if calName == "" {
-		calName = "其他"
-	}
-	writer, ok := ics.writer[calName]
-	if !ok {
-		writer = NewIcsWriter()
-		ics.writer[calName] = writer
-	}
-	doc.Write(writer)
+	doc.Write(ics.writer)
 	return nil
 }
 
-func (ics *ICS) dump() {
-	for k, v := range ics.writer {
-		v.Dump(k)
+func (ics *ICS) dump() error {
+	if ics.writer == nil {
+		return nil
 	}
+
+	return ics.writer.Dump()
 }

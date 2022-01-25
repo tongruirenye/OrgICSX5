@@ -4,17 +4,35 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"regexp"
 	"strings"
 	"time"
 
 	"github.com/tongruirenye/OrgICSX5/server/config"
-	"github.com/tongruirenye/OrgICSX5/server/org"
 	"github.com/tongruirenye/OrgICSX5/server/utils"
+	"github.com/tongruirenye/go-org/org"
 )
 
-var timestampRegexp = regexp.MustCompile(`^<(\d{4}-\d{2}-\d{2})( [A-Za-z\p{Han}]+)?( \d{2}:\d{2})?(?:-(\d{2}:\d{2}))?( \+\d+[dwmy])?>`)
-var timestampRegexp1 = regexp.MustCompile(`--<(\d{4}-\d{2}-\d{2})( [A-Za-z\p{Han}]+)?( \d{2}:\d{2})?(?:-(\d{2}:\d{2}))?( \+\d+[dwmy])?>`)
+func getSection(index int, lvl int, doc *org.Document) *org.Section {
+	return getSectionI(index, lvl, doc.Outline.Section)
+}
+
+func getSectionI(index int, lvl int, sec *org.Section) *org.Section {
+	if sec.Headline != nil && sec.Headline.Index == index && sec.Headline.Lvl == lvl {
+		return sec
+	}
+
+	if sec.Headline != nil && sec.Headline.Lvl >= lvl {
+		return nil
+	}
+
+	for _, v := range sec.Children {
+		if s := getSectionI(index, lvl, v); s != nil {
+			return s
+		}
+	}
+
+	return nil
+}
 
 type IcsWriter struct {
 	ExtendingWriter org.Writer
@@ -23,25 +41,21 @@ type IcsWriter struct {
 	log      *log.Logger
 }
 
-func NewIcsWriter() *IcsWriter {
-	return &IcsWriter{}
-}
-
 func (w *IcsWriter) ClearContent() {
 	w.Builder.Reset()
 }
 
-func (w *IcsWriter) Dump(calName string) error {
-	icsf, err := os.Create(fmt.Sprintf("%s/public/ics/%s.ics", config.AppPath, calName))
+func (w *IcsWriter) Dump() error {
+	icsf, err := os.Create(fmt.Sprintf("%s/public/ics/%s.ics", config.AppPath, config.AppConfig.CalName))
 	if err != nil {
 		return err
 	}
 
 	icsf.WriteString("BEGIN:VCALENDAR\n")
 	icsf.WriteString("VERSION:2.0\n")
-	icsf.WriteString(fmt.Sprintf("X-WR-CALNAME:%s\n", calName))
+	icsf.WriteString(fmt.Sprintf("X-WR-CALNAME:%s\n", config.AppConfig.CalName))
 	icsf.WriteString("PRODID:-////Emacs with Org mode//EN\n")
-	icsf.WriteString(fmt.Sprintf("X-WR-CALDESC:%s\n", calName))
+	icsf.WriteString(fmt.Sprintf("X-WR-CALDESC:%s\n", config.AppConfig.CalName))
 	icsf.WriteString("CALSCALE:GREGORIAN\n")
 	icsf.WriteString("BEGIN:VTIMEZONE\n")
 	icsf.WriteString("TZID:Asia/Shanghai\n")
@@ -63,46 +77,11 @@ func (w *IcsWriter) Dump(calName string) error {
 func (w *IcsWriter) Before(d *org.Document) {
 	w.document = d
 	w.log = d.Log
-	w.log.Printf("nodes size is:%d\n", len(d.Nodes))
+	w.log.Printf("before parse")
 }
 
 func (w *IcsWriter) After(d *org.Document) {
-	dateStr, ok := w.document.BufferSettings["DATE"]
-	if !ok {
-		return
-	}
-	m := timestampRegexp.FindStringSubmatch(dateStr)
-	if m == nil {
-		return
-	}
-
-	t, err := time.Parse("2006-01-02 Mon 15:04", fmt.Sprintf("%s Mon %s", m[1], "00:00"))
-	if err != nil {
-		return
-	}
-
-	var tend *time.Time
-	if m1 := timestampRegexp1.FindStringSubmatch(dateStr); m1 != nil {
-		if te, e := time.Parse("2006-01-02 Mon 15:04", fmt.Sprintf("%s Mon %s", m1[1], "00:00")); e == nil {
-			tend = &te
-		}
-	}
-
-	start := t
-	end := t
-	if tend != nil {
-		end = *tend
-	} else {
-		end = t.AddDate(0, 0, 1)
-	}
-
-	w.WriteString("BEGIN:VEVENT\n")
-	w.WriteString(fmt.Sprintf("UID:%s\n", utils.Md5(time.Now().String())))
-	w.WriteString(fmt.Sprintf("DTSTAMP:%s\n", time.Now().Format("20060102T150400")))
-	w.WriteString(fmt.Sprintf("DTSTART;TZID=Asia/Shanghai;VALUE=DATE-TIME:%s\n", start.Format("20060102T150400")))
-	w.WriteString(fmt.Sprintf("DTEND;TZID=Asia/Shanghai;VALUE=DATE-TIME:%s\n", end.Format("20060102T150400")))
-	w.WriteString(fmt.Sprintf("SUMMARY:%s\n", w.document.BufferSettings["TITLE"]))
-	w.WriteString("END:VEVENT\n")
+	w.log.Printf("after parse")
 }
 
 func (w *IcsWriter) WriterWithExtensions() org.Writer {
@@ -130,37 +109,66 @@ func (w *IcsWriter) WriteNodeWithName(n org.NodeWithName) {
 
 }
 func (w *IcsWriter) WriteHeadline(h org.Headline) {
-	if h.Status == "PROJ" || h.Status == "GOAL" {
+	if h.Status != "SCHED" && h.Status != "DOING" {
 		org.WriteNodes(w, h.Children...)
 		return
 	}
 
-	if h.Time == nil {
-		org.WriteNodes(w, h.Children...)
+	if h.TimePlanning == nil {
 		return
 	}
 
-	if h.Status != "TODO" && h.Status != "INPROGRESS" {
-		org.WriteNodes(w, h.Children...)
-		return
-	}
+	category, ok := h.Properties.Get("CATEGORY")
+	if !ok {
+		section := getSection(h.Index, h.Lvl, w.document)
+		if section == nil {
+			return
+		}
 
-	w.log.Println(h.Status, h.Title[0].String())
+		parent := section.Parent
+		for parent != nil {
+			if parent.Headline != nil {
+				category, ok = parent.Headline.Properties.Get("CATEGORY")
+				if ok {
+					break
+				}
+			}
+			parent = parent.Parent
+		}
+
+		if category == "" {
+			category = "任务"
+		}
+	}
 
 	isDate := true
 	var start, end time.Time
-	planning, _ := h.Time.(org.Planning)
+	var repeat string
+	planning, _ := h.TimePlanning.(org.Planning)
 	if planning.Schedule != nil && planning.Deadline != nil {
+		// repeate
 		schedule, _ := planning.Schedule.(org.Timestamp)
 		deadline, _ := planning.Deadline.(org.Timestamp)
 		start = schedule.Time
-		end = deadline.Time
+		end = schedule.Time
+		if schedule.RangeTime.IsZero() == false {
+			end = schedule.RangeTime
+			isDate = false
+		} else {
+			if schedule.IsDate {
+				end = end.AddDate(0, 0, 1)
+			} else {
+				end = end.Add(1 * time.Hour)
+				isDate = false
+			}
+		}
+		repeat = deadline.Time.Format("20060102T150400")
 	} else if planning.Schedule != nil {
 		schedule, _ := planning.Schedule.(org.Timestamp)
 		start = schedule.Time
 		end = schedule.Time
-		if schedule.EndTime != nil {
-			end = *schedule.EndTime
+		if schedule.RangeTime.IsZero() == false {
+			end = schedule.RangeTime
 			isDate = false
 		} else {
 			if schedule.IsDate {
@@ -181,7 +189,6 @@ func (w *IcsWriter) WriteHeadline(h org.Headline) {
 			isDate = false
 		}
 	} else {
-		org.WriteNodes(w, h.Children...)
 		return
 	}
 
@@ -199,17 +206,14 @@ func (w *IcsWriter) WriteHeadline(h org.Headline) {
 	if uid == "" {
 		uid = utils.Md5(summary)
 	}
-	trigger, _ := h.Properties.Get("ALARM")
-	if trigger == "" {
-		trigger = "10"
-	}
+	trigger := "10"
 
 	status := "TENTATIVE"
 	if h.Status == "TODO" {
 		status = "ACCEPTED"
-	} else if h.Status == "INPROGRESS" {
+	} else if h.Status == "DOING" {
 		status = "IN-PROCESS"
-	} else if h.Status == "NEXT" {
+	} else if h.Status == "SCHED" {
 		status = "NEEDS-ACTION"
 	} else if h.Status == "DONE" {
 		status = "COMPLETED"
@@ -220,13 +224,16 @@ func (w *IcsWriter) WriteHeadline(h org.Headline) {
 	w.WriteString(fmt.Sprintf("DTSTAMP:%s\n", time.Now().Format("20060102T150400")))
 	w.WriteString(fmt.Sprintf("DTSTART;TZID=Asia/Shanghai;VALUE=DATE-TIME:%s\n", start.Format("20060102T150400")))
 	w.WriteString(fmt.Sprintf("DTEND;TZID=Asia/Shanghai;VALUE=DATE-TIME:%s\n", end.Format("20060102T150400")))
-	w.WriteString(fmt.Sprintf("SUMMARY:[%s]%s\n", w.document.BufferSettings["TITLE"], summary))
+	if repeat != "" {
+		w.WriteString(fmt.Sprintf("RRULE:FREQ=DAILY;WKST=MO;UNTIL=%s;INTERVAL=1\n", repeat))
+	}
+	w.WriteString(fmt.Sprintf("SUMMARY:[%s]%s\n", category, summary))
 	w.WriteString(fmt.Sprintf("STATUS:%s\n", status))
 	if description != "" {
 		w.WriteString(fmt.Sprintf("DESCRIPTION:%s\n", description))
 	}
 
-	if trigger != "" && !isDate {
+	if !isDate {
 		w.WriteString("BEGIN:VALARM\n")
 		w.WriteString(fmt.Sprintf("TRIGGER:-PT%sM\n", trigger))
 		w.WriteString("ACTION:DISPLAY\n")
@@ -234,8 +241,6 @@ func (w *IcsWriter) WriteHeadline(h org.Headline) {
 		w.WriteString("END:VALARM\n")
 	}
 	w.WriteString("END:VEVENT\n")
-
-	org.WriteNodes(w, h.Children...)
 }
 func (w *IcsWriter) WriteBlock(b org.Block) {
 
