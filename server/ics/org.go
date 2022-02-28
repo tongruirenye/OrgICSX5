@@ -109,13 +109,23 @@ func (w *IcsWriter) WriteNodeWithName(n org.NodeWithName) {
 
 }
 func (w *IcsWriter) WriteHeadline(h org.Headline) {
-	if h.Status != "SCHED" && h.Status != "DOING" {
+	if h.Status != "SCHED" && h.Status != "DOING" && h.Status != "TODO" {
 		org.WriteNodes(w, h.Children...)
 		return
 	}
 
 	if h.TimePlanning == nil {
 		return
+	}
+
+	if h.Status == "TODO" {
+		style, ok := h.Properties.Get("STYLE")
+		if !ok {
+			return
+		}
+		if style != "habit" {
+			return
+		}
 	}
 
 	category, ok := h.Properties.Get("CATEGORY")
